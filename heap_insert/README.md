@@ -1,0 +1,1 @@
+Why is it really necessary to add a readme file? Every time I forget to do it, and all that for a checker that doesn't need to read it to understand the code, especially since no one is going to read our code anyway :)
