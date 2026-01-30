@@ -1,60 +1,91 @@
 #!/usr/bin/python3
-"""Module for cunting wrds in Reddit hot articles"""
+"""
+0-count.py
+Recursive function that queries the Reddit API, parses the title of all hot
+articles, and prints a sorted count of given keywords (case-insensitive).
+"""
+
 import requests
 
 
-def count_words(subreddit, wrd_list, after=None, wrd_cunt=None):
-    """Recursively cunt keywrds in subreddit titles"""
-    if wrd_cunt is None:
-        wrd_cunt = {}
-        for wrd in wrd_list:
-            wrd_lower = wrd.lower()
-            wrd_cunt[wrd_lower] = 0
+def count_words(subreddit, word_list):
+    """
+    Queries the Reddit API recursively, parses hot article titles,
+    and prints a sorted count of keywords (case-insensitive).
+    """
+    # Normalize word_list: lowercase, count duplicates
+    word_weight = {}
+    for word in word_list:
+        word_lower = word.lower()
+        word_weight[word_lower] = word_weight.get(word_lower, 0) + 1
 
-    url = f"https://www.reddit.com/r/{subreddit}/hot.json"
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    params = {'limit': 100}
+    # Dictionary to store raw counts (how many time each word appear in titles)
+    raw_count = {}
 
-    if after:
-        params['after'] = after
-
-    try:
-        response = requests.get(url, headers=headers, params=params,
-                                allow_redirects=False)
-
-        if response.status_code != 200:
-            return
-
-        data = response.json()
-
-        if 'data' not in data or 'children' not in data['data']:
-            return
-
-        posts = data['data']['children']
-
-        for post in posts:
-            title = post['data']['title'].lower()
-            wrds_in_title = title.split()
-
-            for wrd in wrds_in_title:
-                cleaned_wrd = wrd.strip('.,!?_:;"\'-')
-                if cleaned_wrd in wrd_cunt:
-                    wrd_cunt[cleaned_wrd] += 1
-
-        after = data['data']['after']
-
+    # Helper function to recursively fetch and process hot posts
+    def fetch_hot_posts(subreddit, after=None):
+        # Build URL for hot posts
+        url = f"https://www.reddit.com/r/{subreddit}/hot.json"
+        headers = {"User-Agent": "holberton school project"}
+        params = {"limit": 100}
         if after:
-            cunt_wrds(subreddit, wrd_list, after, wrd_cunt)
-        else:
-            filtered_cunts = {k: v for k, v in wrd_cunt.items() if v > 0}
+            params["after"] = after
 
-            if not filtered_cunts:
-                return
+        try:
+            response = requests.get(
+                url, headers=headers, params=params, allow_redirects=False
+            )
+            if response.status_code != 200:
+                return  # Invalid subreddit or error
 
-            sorted_wrds = sorted(filtered_cunts.items(),
-                                 key=lambda x: (-x[1], x[0]))
-            for wrd, cunt in sorted_wrds:
-                print(f"{wrd}: {cunt}")
+            data = response.json()
+            posts = data["data"]["children"]
 
-    except Exception:
+            # Process each post title
+            for post in posts:
+                title = post["data"]["title"].lower()
+                # Split title into word (only alphanumeric, ignore punctuation)
+                words_in_title = []
+                current_word = ""
+                for char in title:
+                    if char.isalnum():
+                        current_word += char
+                    else:
+                        if current_word:
+                            words_in_title.append(current_word)
+                            current_word = ""
+                if current_word:
+                    words_in_title.append(current_word)
+
+                # Count occurrences of each keyword in this title
+                for word in words_in_title:
+                    if word in word_weight:
+                        raw_count[word] = raw_count.get(word, 0) + 1
+
+            # Check if there is a next page
+            after = data["data"]["after"]
+            if after:
+                fetch_hot_posts(subreddit, after)  # Recursive call
+
+        except Exception:
+            return  # Any error (network, JSON, etc.) → do nothing
+
+    # Start the recursive fetching
+    fetch_hot_posts(subreddit)
+
+    # If no matches, print nothing
+    if not raw_count:
         return
+
+    # Apply weights: if a word appears multiple times in word_list, multiply
+    final_count = {}
+    for word, base_count in word_weight.items():
+        if word in raw_count:
+            final_count[word] = raw_count[word] * base_count
+
+    # Sort: by count descending, then by word ascending
+    sorted_items = sorted(final_count.items(), key=lambda x: (-x[1], x[0]))
+
+    # Print results
+    for word, count in sorted_items:
+        print(f"{word}: {count}")

@@ -1,111 +1,119 @@
 #include "binary_trees.h"
 
-/* Helper functions */
-heap_t *get_last_node(heap_t *root);
-void heapify_down(heap_t *tree);
-
 /**
- * heap_extract - extracts the top value of binary heap
- * @root: pointer to root node of heap address
- * Return: top value (root node)
+ * get_heap_size - Counts the number of nodes in a binary tree
+ * @root: Pointer to the root node
+ *
+ * Return: Number of nodes in the tree
  */
-int heap_extract(heap_t **root)
+size_t get_heap_size(heap_t *root)
 {
-	int max;
-	heap_t *last_node, *parent;
-
-	if (!root || !*root)
+	if (!root)
 		return (0);
-
-	max = (*root)->n;
-
-	/* Find the last inserted node */
-	last_node = get_last_node(*root);
-	if (!last_node)
-		return (0);
-
-	/* Swap last node value with root */
-	(*root)->n = last_node->n;
-
-	/* Remove last node from tree */
-	parent = last_node->parent;
-	if (parent)
-	{
-		if (parent->left == last_node)
-			parent->left = NULL;
-		else
-			parent->right = NULL;
-	}
-
-	free(last_node);
-
-	/* Heapify down */
-	heapify_down(*root);
-
-	return (max);
+	return (1 + get_heap_size(root->left) + get_heap_size(root->right));
 }
 
 /**
- * get_last_node - finds the last node in level order traversal
- * @root: root of the heap
- * Return: last node in the heap
+ * get_last_node - Gets the last level-order node of the heap
+ * @root: Pointer to the root node
+ * @size: Size of the heap
+ * @index: Current index (1-indexed)
+ *
+ * Return: Pointer to the last node
  */
-heap_t *get_last_node(heap_t *root)
+heap_t *get_last_node(heap_t *root, size_t size, size_t index)
 {
-	/* Use a queue to perform level-order traversal */
-	heap_t *queue[1024];
-	int front = 0, rear = 0;
+	heap_t *left, *right;
 
 	if (!root)
 		return (NULL);
 
-	queue[rear++] = root;
+	if (index == size)
+		return (root);
 
-	while (front < rear)
-	{
-		root = queue[front++];
-		if (root->left)
-			queue[rear++] = root->left;
-		if (root->right)
-			queue[rear++] = root->right;
-	}
+	left = get_last_node(root->left, size, 2 * index);
+	if (left)
+		return (left);
 
-	return (root);
+	right = get_last_node(root->right, size, 2 * index + 1);
+	return (right);
 }
 
 /**
- * heapify_down - restores max heap property by pushing the root down
- * @tree: root of heap
+ * heapify_down - Rebuilds the max heap after extraction
+ * @root: Pointer to the root node to heapify
  */
-void heapify_down(heap_t *tree)
+void heapify_down(heap_t *root)
 {
-	heap_t *largest, *left, *right;
+	heap_t *largest = root;
 	int temp;
 
-	if (!tree)
-		return;
-
-	while (tree->left)
+	while (1)
 	{
-		left = tree->left;
-		right = tree->right;
-		largest = tree;
+		largest = root;
 
-		if (left && left->n > largest->n)
-			largest = left;
-		if (right && right->n > largest->n)
-			largest = right;
+		if (root->left && root->left->n > largest->n)
+			largest = root->left;
 
-		if (largest == tree)
+		if (root->right && root->right->n > largest->n)
+			largest = root->right;
+
+		if (largest == root)
 			break;
 
 		/* Swap values */
-		temp = tree->n;
-		tree->n = largest->n;
+		temp = root->n;
+		root->n = largest->n;
 		largest->n = temp;
 
-		/* Move down the tree */
-		tree = largest;
+		root = largest;
 	}
 }
 
+/**
+ * heap_extract - Extracts the root node of a Max Binary Heap
+ * @root: Double pointer to the root node of the heap
+ *
+ * Return: The value stored in the root node, or 0 on failure
+ */
+int heap_extract(heap_t **root)
+{
+	int extracted_value;
+	heap_t *last_node, *heap_root;
+	size_t size;
+
+	if (!root || !*root)
+		return (0);
+
+	heap_root = *root;
+	extracted_value = heap_root->n;
+	size = get_heap_size(heap_root);
+
+	if (size == 1)
+	{
+		free(heap_root);
+		*root = NULL;
+		return (extracted_value);
+	}
+
+	last_node = get_last_node(heap_root, size, 1);
+
+	/* Replace root value with last node value */
+	heap_root->n = last_node->n;
+
+	/* Remove the last node */
+	if (last_node->parent)
+	{
+		if (last_node->parent->right == last_node)
+			last_node->parent->right = NULL;
+		else
+			last_node->parent->left = NULL;
+	}
+
+	free(last_node);
+
+	/* Rebuild the heap */
+	heapify_down(heap_root);
+
+	return (extracted_value);
+}
